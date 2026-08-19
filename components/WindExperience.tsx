@@ -19,6 +19,35 @@ interface TooltipState extends WindSample {
   top: number;
 }
 
+interface TooltipPointer {
+  clientX: number;
+  clientY: number;
+  pointerType: string;
+}
+
+function tooltipAtPointer(
+  engine: WindEngine,
+  canvas: HTMLCanvasElement,
+  pointer: TooltipPointer,
+): TooltipState | null {
+  const bounds = canvas.getBoundingClientRect();
+  const x = pointer.clientX - bounds.left;
+  const y = pointer.clientY - bounds.top;
+  const sample = engine.sampleAt(x, y);
+  if (!sample) return null;
+
+  const tooltipWidth = 238;
+  const tooltipHeight = 58;
+  return {
+    ...sample,
+    left: Math.max(10, Math.min(x + 14, bounds.width - tooltipWidth - 10)),
+    top: Math.max(
+      10,
+      Math.min(y - tooltipHeight - 14, bounds.height - tooltipHeight - 10),
+    ),
+  };
+}
+
 const longDate = new Intl.DateTimeFormat("es-MX", {
   day: "numeric",
   month: "short",
@@ -45,6 +74,7 @@ export function WindExperience() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sliderRef = useRef<HTMLInputElement>(null);
   const engineRef = useRef<WindEngine | null>(null);
+  const tooltipPointerRef = useRef<TooltipPointer | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [error, setError] = useState("");
   const [date, setDate] = useState(initialDate);
@@ -113,6 +143,12 @@ export function WindExperience() {
             onSnapshot(snapshot) {
               setDate(snapshot.date);
               setPlaying(snapshot.playing);
+              const pointer = tooltipPointerRef.current;
+              const canvas = canvasRef.current;
+              if (!pointer || !canvas || !engine) return;
+              const nextTooltip = tooltipAtPointer(engine, canvas, pointer);
+              if (!nextTooltip) tooltipPointerRef.current = null;
+              setTooltip(nextTooltip);
             },
             onHairCount(count) {
               setHairCount(count);
@@ -159,28 +195,25 @@ export function WindExperience() {
 
   function seek(value: string) {
     engineRef.current?.seek(Number(value));
-    setTooltip(null);
   }
 
   function inspect(event: PointerEvent<HTMLCanvasElement>) {
     const engine = engineRef.current;
-    const stage = stageRef.current;
-    if (!engine || !stage) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const x = event.clientX - bounds.left;
-    const y = event.clientY - bounds.top;
-    const sample = engine.sampleAt(x, y);
-    if (!sample) {
-      setTooltip(null);
-      return;
-    }
-    const tooltipWidth = 238;
-    const tooltipHeight = 58;
-    setTooltip({
-      ...sample,
-      left: Math.max(10, Math.min(x + 14, bounds.width - tooltipWidth - 10)),
-      top: Math.max(10, Math.min(y - tooltipHeight - 14, bounds.height - tooltipHeight - 10)),
-    });
+    if (!engine) return;
+    const pointer = {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pointerType: event.pointerType,
+    };
+    const nextTooltip = tooltipAtPointer(engine, event.currentTarget, pointer);
+    tooltipPointerRef.current = nextTooltip ? pointer : null;
+    setTooltip(nextTooltip);
+  }
+
+  function clearTooltip(event: PointerEvent<HTMLCanvasElement>) {
+    if (event.pointerType === "touch" && event.type === "pointerleave") return;
+    tooltipPointerRef.current = null;
+    setTooltip(null);
   }
 
   return (
@@ -245,7 +278,8 @@ export function WindExperience() {
             aria-label="Visualización animada del viento y la temperatura sobre México"
             onPointerMove={inspect}
             onPointerDown={inspect}
-            onPointerLeave={() => setTooltip(null)}
+            onPointerLeave={clearTooltip}
+            onPointerCancel={clearTooltip}
           />
 
           <div className="period-chip" aria-hidden="true">
@@ -265,7 +299,7 @@ export function WindExperience() {
             <div
               className="map-tooltip"
               style={{ left: tooltip.left, top: tooltip.top }}
-              role="status"
+              role="tooltip"
             >
               <strong>{tooltip.temperature.toFixed(1)} °C</strong>
               <span>

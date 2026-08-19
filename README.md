@@ -57,7 +57,7 @@ La reproducción recorre las 960 horas en cerca de un minuto. El campo se interp
 | Cambiar de tema | Botón de tema en el encabezado | Tocar el botón de tema |
 | Leer la metodología | Botón de información | Tocar el botón de información |
 
-La consulta puntual muestra temperatura, velocidad y procedencia cardinal estimadas para la posición elegida.
+La consulta puntual muestra temperatura, velocidad y procedencia cardinal estimadas para la posición elegida, y sus valores se actualizan mientras avanza la línea de tiempo.
 
 ## Fuentes y metodología
 
